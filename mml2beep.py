@@ -423,17 +423,35 @@ class MmlParser:
 def main():
     parser = ArgumentParser(description='转换MML乐谱到beep谱')
     parser.add_argument('mml_file', help='输入的MML文件，格式为txt')
-    parser.add_argument('beep_file', help='输出的beep文件路径，格式为JSON。其中第一个数为频率(Hz)，如果为0则表示延时。'
+    parser.add_argument('beep_file', help='输出的beep文件路径。其中第一个数为频率(Hz)，如果为0则表示延时。'
                                           '第二个数为持续时间(ms)')
-    parser.add_argument('-t', '--track', type=int, default=1, help='输出第几个音轨，默认为1')
+    parser.add_argument('-t', '--track', type=lambda x: int(x) - 1, default=1, help='输出第几个音轨，默认为1')
+    parser.add_argument('-f', '--format', type=lambda x: x.lower(), choices=['json', 'cpp'],
+                        default='json', help='输出格式，默认为json')
     args = parser.parse_args()
-    args.track -= 1
 
     with open(args.mml_file) as f:
         mml = f.read()
     res = MmlParser().parse(mml)
     with open(args.beep_file, 'w') as f:
-        json.dump(res[args.track], f)
+        if args.format == 'json':
+            json.dump(res[args.track], f)
+        elif args.format == 'cpp':
+            f.write("""#include <vector>
+
+struct Note {
+    unsigned int frequency;
+    unsigned int duration;
+};
+
+std::vector<Note> notes = {
+""")
+            for i in range(0, len(res[args.track]), 6):
+                f.write('    ')
+                for note in res[args.track][i: i + 6]:
+                    f.write(f'{{{note[0]}, {note[1]}}}, ')
+                f.write('\n')
+            f.write('};\n')
 
 
 if __name__ == '__main__':
